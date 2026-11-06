@@ -1,0 +1,64 @@
+
+import java.util.HashSet;
+import java.util.Objects;
+import java.util.Set;
+
+class Student {
+    private String regNo;
+    private final String name;
+
+    Student(String regNo, String name) {
+        this.regNo = regNo;
+        this.name = name;
+    }
+
+    void changeRegNo(String newRegNo) {
+        regNo = newRegNo;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Student)) return false;
+        Student other = (Student) o;
+        return Objects.equals(regNo, other.regNo);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(regNo);
+    }
+
+    @Override
+    public String toString() {
+        return regNo + " " + name;
+    }
+}
+
+public class Q3Attendance {
+    public static void main(String[] args) {
+        Set<Student> present = new HashSet<>();
+
+        Student first = new Student("192311001", "Arun");
+        present.add(first);
+        present.add(new Student("192311002", "Divya"));
+        present.add(new Student("192311001", "Arun"));
+
+        System.out.println("Corrected unique students: " + present.size());
+
+        Set<Student> sameReference = new HashSet<>();
+        Student one = new Student("192311003", "Meena");
+        sameReference.add(one);
+        sameReference.add(one);
+
+        System.out.println("Same reference test: " + sameReference.size());
+
+        Set<Student> mutableTest = new HashSet<>();
+        Student changing = new Student("192311004", "Kumar");
+        mutableTest.add(changing);
+        changing.changeRegNo("192311099");
+
+        System.out.println("Contains after key change: " + mutableTest.contains(changing));
+        System.out.println("Set size after key change: " + mutableTest.size());
+    }
+}
