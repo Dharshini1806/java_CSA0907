@@ -1,0 +1,91 @@
+
+public class Q7Redesign {
+
+    static String original(int n) {
+        String ticket = "";
+
+        for (int i = 0; i < n; i++) {
+            ticket = ticket + "Field" + i + "\n";
+        }
+
+        return ticket;
+    }
+
+    static String improved(int n) {
+        StringBuilder ticket = new StringBuilder();
+
+        for (int i = 0; i < n; i++) {
+            ticket.append("Field").append(i).append("\n");
+        }
+
+        return ticket.toString();
+    }
+
+    static long testOriginal(int tickets, int fields) {
+        long start = System.nanoTime();
+        long total = 0;
+
+        for (int i = 0; i < tickets; i++) {
+            total += original(fields).length();
+        }
+
+        return System.nanoTime() - start;
+    }
+
+    static long testImproved(int tickets, int fields) {
+        long start = System.nanoTime();
+        long total = 0;
+
+        for (int i = 0; i < tickets; i++) {
+            total += improved(fields).length();
+        }
+
+        return System.nanoTime() - start;
+    }
+
+    public static void main(String[] args) {
+
+        int tickets = 1000;
+        int fields = 200;
+
+        System.out.println("Q7 - Performance Comparison");
+
+        String oldResult = original(fields);
+        String newResult = improved(fields);
+
+        System.out.println("Output Match: " +
+                oldResult.equals(newResult));
+
+        // Warm-up
+        testOriginal(100, 50);
+        testImproved(100, 50);
+
+        long oldTime = 0;
+        long newTime = 0;
+
+        int repetitions = 5;
+
+        for (int i = 0; i < repetitions; i++) {
+            oldTime += testOriginal(tickets, fields);
+            newTime += testImproved(tickets, fields);
+        }
+
+        double oldAverage =
+                oldTime / (double) repetitions / 1000000;
+
+        double newAverage =
+                newTime / (double) repetitions / 1000000;
+
+        System.out.println("Original String Time: "
+                + oldAverage + " ms");
+
+        System.out.println("Improved StringBuilder Time: "
+                + newAverage + " ms");
+
+        double improvement =
+                ((oldAverage - newAverage) / oldAverage) * 100;
+
+        System.out.println("Performance Improvement: "
+                + improvement + "%");
+    }
+}
