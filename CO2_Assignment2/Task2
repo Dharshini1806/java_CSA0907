@@ -1,0 +1,100 @@
+
+import java.util.*;
+
+public class Q2ListBenchmark {
+
+    static long time(Runnable action) {
+        long start = System.nanoTime();
+        action.run();
+        return System.nanoTime() - start;
+    }
+
+    static void test(int n) {
+        System.out.println("\nList size: " + n);
+
+        ArrayList<Integer> array = new ArrayList<>();
+        LinkedList<Integer> linked = new LinkedList<>();
+
+        for (int i = 0; i < n; i++) {
+            array.add(i);
+            linked.add(i);
+        }
+
+        int operations = Math.min(n, 2000);
+
+        System.out.println("ArrayList append (ns): " + time(() -> {
+            ArrayList<Integer> a = new ArrayList<>(array);
+            for (int i = 0; i < operations; i++) a.add(-i);
+        }));
+
+        System.out.println("LinkedList append (ns): " + time(() -> {
+            LinkedList<Integer> a = new LinkedList<>(linked);
+            for (int i = 0; i < operations; i++) a.add(-i);
+        }));
+
+        System.out.println("ArrayList front insert (ns): " + time(() -> {
+            ArrayList<Integer> a = new ArrayList<>(array);
+            for (int i = 0; i < operations; i++) a.add(0, -i);
+        }));
+
+        System.out.println("LinkedList front insert (ns): " + time(() -> {
+            LinkedList<Integer> a = new LinkedList<>(linked);
+            for (int i = 0; i < operations; i++) a.addFirst(-i);
+        }));
+
+        System.out.println("ArrayList middle insert (ns): " + time(() -> {
+            ArrayList<Integer> a = new ArrayList<>(array);
+            for (int i = 0; i < operations; i++)
+                a.add(a.size() / 2, -i);
+        }));
+
+        System.out.println("LinkedList middle insert (ns): " + time(() -> {
+            LinkedList<Integer> a = new LinkedList<>(linked);
+            for (int i = 0; i < operations; i++) {
+                ListIterator<Integer> it = a.listIterator(a.size() / 2);
+                it.add(-i);
+            }
+        }));
+
+        System.out.println("ArrayList indexed access (ns): " + time(() -> {
+            long sum = 0;
+            for (int i = 0; i < operations; i++) sum += array.get(i);
+            if (sum == -1) System.out.println(sum);
+        }));
+
+        System.out.println("LinkedList indexed access (ns): " + time(() -> {
+            long sum = 0;
+            for (int i = 0; i < operations; i++) sum += linked.get(i);
+            if (sum == -1) System.out.println(sum);
+        }));
+
+        System.out.println("ArrayList iteration (ns): " + time(() -> {
+            long sum = 0;
+            for (int x : array) sum += x;
+            if (sum == -1) System.out.println(sum);
+        }));
+
+        System.out.println("LinkedList iteration (ns): " + time(() -> {
+            long sum = 0;
+            for (int x : linked) sum += x;
+            if (sum == -1) System.out.println(sum);
+        }));
+
+        ArrayDeque<Integer> deque = new ArrayDeque<>();
+
+        System.out.println("ArrayDeque add/remove both ends (ns): " + time(() -> {
+            for (int i = 0; i < n; i++) deque.addLast(i);
+            for (int i = 0; i < n / 2; i++) {
+                deque.addFirst(-i);
+                deque.removeLast();
+                deque.removeFirst();
+            }
+        }));
+    }
+
+    public static void main(String[] args) {
+        test(1000);
+        test(10000);
+        test(100000);
+    }
+}
