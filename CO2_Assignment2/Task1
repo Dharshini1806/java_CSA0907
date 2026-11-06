@@ -1,90 +1,60 @@
-public class Q7Redesign {
-
-    static String original(int n) {
+public class Q1TicketBenchmark {
+    static final int REPEATS = 5;
+ 
+    static String buildWithString(int fields) {
         String ticket = "";
-
-        for (int i = 0; i < n; i++) {
-            ticket = ticket + "Field" + i + "\n";
+        for (int i = 0; i < fields; i++) {
+            ticket = ticket + "FIELD" + i + "=VALUE" + i + "\n";
         }
-
         return ticket;
     }
-
-    static String improved(int n) {
+ 
+    static String buildWithBuilder(int fields) {
         StringBuilder ticket = new StringBuilder();
-
-        for (int i = 0; i < n; i++) {
-            ticket.append("Field").append(i).append("\n");
+        for (int i = 0; i < fields; i++) {
+            ticket.append("FIELD").append(i).append("=VALUE").append(i).append('\n');
         }
-
         return ticket.toString();
     }
-
-    static long testOriginal(int tickets, int fields) {
-        long start = System.nanoTime();
-        long total = 0;
-
-        for (int i = 0; i < tickets; i++) {
-            total += original(fields).length();
+ 
+    static String buildWithBuffer(int fields) {
+        StringBuffer ticket = new StringBuffer();
+        for (int i = 0; i < fields; i++) {
+            ticket.append("FIELD").append(i).append("=VALUE").append(i).append('\n');
         }
-
-        return System.nanoTime() - start;
+        return ticket.toString();
     }
-
-    static long testImproved(int tickets, int fields) {
+ 
+    static long measure(int method, int tickets, int fields) {
         long start = System.nanoTime();
-        long total = 0;
-
-        for (int i = 0; i < tickets; i++) {
-            total += improved(fields).length();
+        long checksum = 0;
+        for (int t = 0; t < tickets; t++) {
+            String result;
+            if (method == 1) result = buildWithString(fields);
+            else if (method == 2) result = buildWithBuilder(fields);
+            else result = buildWithBuffer(fields);
+            checksum += result.length();
         }
-
-        return System.nanoTime() - start;
+        long elapsed = System.nanoTime() - start;
+        if (checksum == 0) System.out.println(" "); // keep result observable
+        return elapsed;
     }
-
+ 
+    static void runWorkload(String name, int tickets, int fields) {
+        System.out.println("\n" + name + ": " + tickets + " tickets, " + fields + " fields");
+        String[] labels = {"String +", "StringBuilder", "StringBuffer"};
+        for (int method = 1; method <= 3; method++) {
+            for (int w = 0; w < 2; w++) measure(method, Math.min(tickets, 100), fields);
+            long total = 0;
+            for (int r = 0; r < REPEATS; r++) total += measure(method, tickets, fields);
+            System.out.printf("%s average: %.3f ms%n", labels[method - 1],
+                    total / (double) REPEATS / 1_000_000.0);
+        }
+    }
+ 
     public static void main(String[] args) {
-
-        int tickets = 1000;
-        int fields = 200;
-
-        System.out.println("Q7 - Performance Comparison");
-
-        String oldResult = original(fields);
-        String newResult = improved(fields);
-
-        System.out.println("Output Match: " +
-                oldResult.equals(newResult));
-
-        // Warm-up
-        testOriginal(100, 50);
-        testImproved(100, 50);
-
-        long oldTime = 0;
-        long newTime = 0;
-
-        int repetitions = 5;
-
-        for (int i = 0; i < repetitions; i++) {
-            oldTime += testOriginal(tickets, fields);
-            newTime += testImproved(tickets, fields);
-        }
-
-        double oldAverage =
-                oldTime / (double) repetitions / 1000000;
-
-        double newAverage =
-                newTime / (double) repetitions / 1000000;
-
-        System.out.println("Original String Time: "
-                + oldAverage + " ms");
-
-        System.out.println("Improved StringBuilder Time: "
-                + newAverage + " ms");
-
-        double improvement =
-                ((oldAverage - newAverage) / oldAverage) * 100;
-
-        System.out.println("Performance Improvement: "
-                + improvement + "%");
+        runWorkload("A - Small", 1, 6);
+        runWorkload("B - Heavy", 10000, 50);
+        runWorkload("C - Large fields", 2000, 200);
     }
 }
