@@ -1,0 +1,72 @@
+import java.util.*;
+ 
+class Medicine {
+    String code;
+    String name;
+    int quantity;
+ 
+    Medicine(String code, String name, int quantity) {
+        this.code = code;
+        this.name = name;
+        this.quantity = quantity;
+    }
+ 
+    @Override
+    public String toString() {
+        return code + " - " + name + " : " + quantity;
+    }
+}
+ 
+public class Q4PharmacyBenchmark {
+    static Map<String, Medicine> makeMap(String type, int n) {
+        Map<String, Medicine> map;
+        if (type.equals("TreeMap")) map = new TreeMap<>();
+        else if (type.equals("LinkedHashMap")) map = new LinkedHashMap<>();
+        else map = new HashMap<>();
+ 
+        for (int i = 0; i < n; i++) {
+            String code = String.format("MED%06d", i);
+            map.put(code, new Medicine(code, "Medicine" + i, 100 + i));
+        }
+        return map;
+    }
+ 
+    static void test(String type, int n) {
+        Map<String, Medicine> map = makeMap(type, n);
+        long start = System.nanoTime();
+        long sum = 0;
+        for (int i = 0; i < 100000; i++) {
+            Medicine m = map.get(String.format("MED%06d", i % n));
+            if (m != null) sum += m.quantity;
+        }
+        long lookupTime = System.nanoTime() - start;
+ 
+        start = System.nanoTime();
+        List<String> codeReport = new ArrayList<>(map.keySet());
+        Collections.sort(codeReport);
+        long codeReportTime = System.nanoTime() - start;
+ 
+        start = System.nanoTime();
+        StringBuilder insertionReport = new StringBuilder();
+        for (Medicine m : map.values()) insertionReport.append(m.code).append(' ');
+        long insertionReportTime = System.nanoTime() - start;
+ 
+        System.out.println("\n" + type + " medicines=" + n);
+        System.out.println("100,000 lookups (ms): " + lookupTime / 1_000_000.0);
+        System.out.println("Code-order report incl. sort (ms): " + codeReportTime / 1_000_000.0);
+        System.out.println("Iteration report (ms): " + insertionReportTime / 1_000_000.0);
+        System.out.println("First code in code report: " +
+                (codeReport.isEmpty() ? "none" : codeReport.get(0)));
+        System.out.println("Checksum: " + sum);
+    }
+ 
+    public static void main(String[] args) {
+        int[] sizes = {1000, 10000, 100000};
+        for (int n : sizes) {
+            test("HashMap", n);
+            test("TreeMap", n);
+            test("LinkedHashMap", n);
+        }
+    }
+}
+
