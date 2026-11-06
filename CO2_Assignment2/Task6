@@ -1,0 +1,23 @@
+import java.util.*;
+ 
+public class Q6QueueBenchmark {
+    static void test(int n) {
+        PriorityQueue<Integer> q = new PriorityQueue<>();
+        long start = System.nanoTime();
+        for (int i = n; i > 0; i--) q.add(i);
+        long addTime = System.nanoTime() - start;
+ 
+        start = System.nanoTime();
+        while (!q.isEmpty()) q.poll();
+        long removeTime = System.nanoTime() - start;
+ 
+        System.out.println("n=" + n + ", add ms=" + addTime / 1_000_000.0
+                + ", remove ms=" + removeTime / 1_000_000.0);
+    }
+ 
+    public static void main(String[] args) {
+        test(1000);
+        test(10000);
+        test(100000);
+    }
+}
