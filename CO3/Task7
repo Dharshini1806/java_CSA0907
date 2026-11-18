@@ -1,0 +1,117 @@
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+ 
+class ResultRecord {
+    final String fileName;
+    final int mark;
+    final String grade;
+ 
+    ResultRecord(String fileName, int mark, String grade) {
+        this.fileName = fileName;
+        this.mark = mark;
+        this.grade = grade;
+    }
+}
+ 
+class ScoreFileTask implements Callable<ResultRecord> {
+    private final Path file;
+ 
+    ScoreFileTask(Path file) { this.file = file; }
+ 
+    public ResultRecord call() throws Exception {
+        String content = Files.readString(file).trim();
+        int mark;
+        try {
+            mark = Integer.parseInt(content);
+        } catch (NumberFormatException e) {
+            throw new IOException("Corrupt score in " + file.getFileName(), e);
+        }
+ 
+        if (mark < 0 || mark > 100) {
+            throw new IOException("Score outside 0 to 100 in "
+                    + file.getFileName());
+        }
+ 
+        String grade;
+        if (mark >= 90) grade = "A";
+        else if (mark >= 80) grade = "B";
+        else if (mark >= 70) grade = "C";
+        else if (mark >= 50) grade = "D";
+        else grade = "F";
+ 
+        return new ResultRecord(file.getFileName().toString(), mark, grade);
+    }
+}
+ 
+public class ResultProcessor {
+    public static void main(String[] args) throws Exception {
+        int poolSize = args.length > 0 ? Integer.parseInt(args[0]) : 4;
+        Path folder = Paths.get("scores");
+ 
+        List<Path> files = new ArrayList<>();
+        if (Files.exists(folder)) {
+            try (var stream = Files.list(folder)) {
+                stream.filter(Files::isRegularFile)
+                      .forEach(files::add);
+            }
+        }
+ 
+        // Add a deliberately missing path to demonstrate failure handling.
+        files.add(folder.resolve("missing-score.txt"));
+ 
+        ExecutorService executor = Executors.newFixedThreadPool(poolSize);
+        ConcurrentLinkedQueue<ResultRecord> successes =
+                new ConcurrentLinkedQueue<>();
+        ConcurrentLinkedQueue<String> failures =
+                new ConcurrentLinkedQueue<>();
+        List<Future<ResultRecord>> futures = new ArrayList<>();
+ 
+        long start = System.nanoTime();
+ 
+        for (Path file : files) {
+            futures.add(executor.submit(new ScoreFileTask(file)));
+        }
+ 
+        for (int i = 0; i < futures.size(); i++) {
+            try {
+                ResultRecord result = futures.get(i).get();
+                successes.add(result);
+            } catch (ExecutionException e) {
+                Throwable cause = e.getCause();
+                failures.add(files.get(i).getFileName() + ": "
+                        + cause.getMessage());
+            }
+        }
+ 
+        executor.shutdown();
+        executor.awaitTermination(1, TimeUnit.MINUTES);
+ 
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+ 
+        System.out.println("Files submitted: " + files.size());
+        System.out.println("Successful results: " + successes.size());
+        System.out.println("Failed files: " + failures.size());
+        System.out.println("Total accounted for: "
+                + (successes.size() + failures.size()));
+        System.out.println("Elapsed time (ms): " + elapsedMs);
+ 
+        for (ResultRecord r : successes) {
+            System.out.println(r.fileName + " -> " + r.mark
+                    + " -> " + r.grade);
+        }
+        for (String failure : failures) {
+            System.out.println("FAIL: " + failure);
+        }
+    }
+}
