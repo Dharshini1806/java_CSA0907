@@ -1,0 +1,78 @@
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+ 
+public class SalesReport {
+    static final List<String> FILES =
+            Arrays.asList("store1.txt", "store2.txt", "store3.txt");
+ 
+    static void generateManual(String output) {
+        BufferedWriter writer = null;
+        try {
+            writer = new BufferedWriter(new FileWriter(output));
+            for (String file : FILES) {
+                BufferedReader reader = null;
+                try {
+                    reader = new BufferedReader(new FileReader(file));
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        writer.write(line);
+                        writer.newLine();
+                    }
+                } catch (IOException e) {
+                    System.out.println("Failed while reading " + file
+                            + ": " + e.getMessage());
+                    throw new RuntimeException(e);
+                } finally {
+                    if (reader != null) {
+                        try { reader.close(); }
+                        catch (IOException e) {
+                            System.out.println("Reader close failed: " + e);
+                        }
+                    }
+                }
+            }
+        } catch (IOException | RuntimeException e) {
+            System.out.println("Manual report failed: " + e.getMessage());
+        } finally {
+            if (writer != null) {
+                try { writer.close(); }
+                catch (IOException e) {
+                    System.out.println("Writer close failed: " + e);
+                }
+            }
+        }
+    }
+ 
+    static void generateSafe(String output) {
+        try (BufferedWriter writer =
+                     new BufferedWriter(new FileWriter(output))) {
+            for (String file : FILES) {
+                System.out.println("Reading " + file);
+                try (BufferedReader reader =
+                             new BufferedReader(new FileReader(file))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        writer.write(line);
+                        writer.newLine();
+                    }
+                }
+            }
+            System.out.println("Report generated: " + output);
+        } catch (IOException e) {
+            System.out.println("Safe report failed: " + e.getMessage());
+            for (Throwable s : e.getSuppressed()) {
+                System.out.println("Suppressed: " + s.getMessage());
+            }
+        }
+    }
+ 
+    public static void main(String[] args) {
+        generateManual("manual-report.txt");
+        generateSafe("safe-report.txt");
+    }
+}
