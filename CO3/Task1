@@ -1,0 +1,50 @@
+import java.util.InputMismatchException;
+import java.util.Scanner;
+ 
+class InsufficientFundsException extends Exception {
+    InsufficientFundsException(String message) {
+        super(message);
+    }
+}
+ 
+public class ATMWithdrawal {
+    public static void main(String[] args) {
+        Scanner sc = new Scanner(System.in);
+        double balance = 5000.0;
+ 
+        try {
+            System.out.print("Enter account number: ");
+            String account = sc.nextLine();
+ 
+            if (account.trim().isEmpty()) {
+                throw new IllegalArgumentException("Account number cannot be empty");
+            }
+ 
+            System.out.print("Enter withdrawal amount: ");
+            double amount = sc.nextDouble();
+ 
+            if (amount <= 0) {
+                throw new IllegalArgumentException("Amount must be positive");
+            }
+ 
+            if (amount > balance) {
+                throw new InsufficientFundsException("Insufficient account balance");
+            }
+ 
+            balance -= amount;
+            System.out.println("Withdrawal successful");
+            System.out.println("Cash dispensed: " + amount);
+            System.out.println("Remaining balance: " + balance);
+ 
+        } catch (InputMismatchException | NumberFormatException e) {
+            System.out.println("Invalid input: enter a numeric amount");
+        } catch (IllegalArgumentException e) {
+            System.out.println("Validation error: " + e.getMessage());
+        } catch (InsufficientFundsException e) {
+            System.out.println("Transaction declined: " + e.getMessage());
+        } finally {
+            System.out.println("ATM transaction completed.");
+            sc.close();
+        }
+    }
+}
