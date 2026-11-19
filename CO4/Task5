@@ -1,0 +1,37 @@
+// (a) Frame implements ActionListener
+public class ConverterA extends JFrame implements ActionListener {
+    JTextField amount = new JTextField(10);
+    JComboBox<String> target = new JComboBox<>(new String[]{"USD","EUR"});
+    JLabel result = new JLabel();
+    JButton convert = new JButton("Convert");
+    ConverterA() {
+        setLayout(new FlowLayout());
+        add(amount); add(target); add(convert); add(result);
+        convert.addActionListener(this);
+        addWindowListener(new WindowAdapter() {
+            public void windowClosing(WindowEvent e) { dispose(); }
+        });
+        pack();
+    }
+    public void actionPerformed(ActionEvent e) { convert(); }
+    void convert() {
+        try {
+            double value = Double.parseDouble(amount.getText());
+            double rate = target.getSelectedItem().equals("USD") ? .012 : .011;
+            result.setText(String.format("%.2f", value * rate));
+        } catch (NumberFormatException ex) { result.setText("Invalid amount"); }
+    }
+}
+// (b) Named inner class
+class ConvertHandler implements ActionListener {
+    public void actionPerformed(ActionEvent e) { convert(); }
+}
+// register: convert.addActionListener(new ConvertHandler());
+
+// (c) Anonymous inner class
+convert.addActionListener(new ActionListener() {
+    public void actionPerformed(ActionEvent e) { convert(); }
+});
+
+// (d) Lambda
+convert.addActionListener(e -> convert());
