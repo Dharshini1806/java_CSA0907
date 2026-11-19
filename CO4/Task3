@@ -1,0 +1,49 @@
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+
+public class LibrarySearch extends JFrame {
+    JTextField search = new JTextField(18);
+    JComboBox<String> category = new JComboBox<>(new String[]{"All","Books","Journals"});
+    JTextArea results = new JTextArea();
+    JLabel status = new JLabel("Ready");
+
+    public LibrarySearch() {
+        super("Campus Library Search");
+        setLayout(new BorderLayout(5,5));
+        JLabel title = new JLabel("Campus Library", JLabel.CENTER);
+        title.setFont(new Font("Arial", Font.BOLD, 20));
+        add(title, BorderLayout.NORTH);
+
+        JPanel content = new JPanel(new BorderLayout(5,5));
+        JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        searchRow.add(search); searchRow.add(category);
+        JButton find = new JButton("Search");
+        searchRow.add(find);
+        content.add(searchRow, BorderLayout.NORTH);
+
+        results.setEditable(false);
+        results.setText("Search results will appear here.");
+        content.add(new JScrollPane(results), BorderLayout.CENTER);
+
+        JPanel buttons = new JPanel(new FlowLayout());
+        buttons.add(new JButton("Prev"));
+        buttons.add(new JButton("Next"));
+        buttons.add(new JButton("Reserve"));
+        content.add(buttons, BorderLayout.SOUTH);
+        add(content, BorderLayout.CENTER);
+        add(status, BorderLayout.SOUTH);
+
+        find.addActionListener(e -> {
+            results.setText("Results for: " + search.getText()
+                + "\\nCategory: " + category.getSelectedItem());
+            status.setText("Search completed");
+        });
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(600,400);
+        setLocationRelativeTo(null);
+    }
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new LibrarySearch().setVisible(true));
+    }
+}
