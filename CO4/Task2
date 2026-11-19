@@ -1,0 +1,205 @@
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.HashMap;
+import java.util.Map;
+
+public class AppointmentDesk extends JFrame {
+
+    JTextField patientId = new JTextField(15);
+
+    JComboBox<String> department = new JComboBox<>(
+        new String[]{"Cardiology", "Neurology", "Orthopedics"}
+    );
+
+    JComboBox<String> doctor = new JComboBox<>();
+
+    JComboBox<String> timeSlot = new JComboBox<>(
+        new String[]{"10:00 AM", "11:00 AM", "12:00 PM", "2:00 PM", "3:00 PM"}
+    );
+
+    JButton book = new JButton("Book Appointment");
+    JButton clear = new JButton("Clear");
+
+    JLabel status = new JLabel("Enter patient details");
+
+    Map<String, String[]> doctorMap = new HashMap<>();
+
+    boolean bookingInProgress = false;
+
+    public AppointmentDesk() {
+
+        setTitle("Hospital Appointment Desk");
+        setLayout(new BorderLayout(10, 10));
+
+        doctorMap.put("Cardiology",
+            new String[]{"Dr. Arun", "Dr. Priya"});
+
+        doctorMap.put("Neurology",
+            new String[]{"Dr. Kumar", "Dr. Meena"});
+
+        doctorMap.put("Orthopedics",
+            new String[]{"Dr. Ravi", "Dr. Suresh"});
+
+        JPanel form = new JPanel(new GridLayout(4, 2, 10, 10));
+
+        form.add(new JLabel("Patient ID:"));
+        form.add(patientId);
+
+        form.add(new JLabel("Department:"));
+        form.add(department);
+
+        form.add(new JLabel("Doctor:"));
+        form.add(doctor);
+
+        form.add(new JLabel("Time Slot:"));
+        form.add(timeSlot);
+
+        JPanel buttons = new JPanel();
+
+        buttons.add(book);
+        buttons.add(clear);
+
+        add(form, BorderLayout.CENTER);
+        add(buttons, BorderLayout.SOUTH);
+        add(status, BorderLayout.NORTH);
+
+        department.addActionListener(e -> updateDoctors());
+
+        book.addActionListener(e -> bookAppointment());
+
+        clear.addActionListener(e -> clearForm());
+
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+
+                if (bookingInProgress) {
+                    int choice = JOptionPane.showConfirmDialog(
+                        AppointmentDesk.this,
+                        "Booking is in progress. Do you want to close?",
+                        "Confirm Exit",
+                        JOptionPane.YES_NO_OPTION
+                    );
+
+                    if (choice == JOptionPane.YES_OPTION) {
+                        dispose();
+                    }
+                } else {
+                    dispose();
+                }
+            }
+        });
+
+        updateDoctors();
+
+        setSize(450, 300);
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setVisible(true);
+    }
+
+    void updateDoctors() {
+
+        String selectedDepartment =
+            (String) department.getSelectedItem();
+
+        doctor.removeAllItems();
+
+        String[] doctors = doctorMap.get(selectedDepartment);
+
+        for (String d : doctors) {
+            doctor.addItem(d);
+        }
+    }
+
+    void bookAppointment() {
+
+        String id = patientId.getText().trim();
+
+        if (id.isEmpty()) {
+            JOptionPane.showMessageDialog(
+                this,
+                "Please enter Patient ID"
+            );
+            return;
+        }
+
+        String selectedDepartment =
+            (String) department.getSelectedItem();
+
+        String selectedDoctor =
+            (String) doctor.getSelectedItem();
+
+        String selectedTime =
+            (String) timeSlot.getSelectedItem();
+
+        bookingInProgress = true;
+        book.setEnabled(false);
+
+        status.setText("Booking appointment...");
+
+        SwingWorker<Boolean, Void> worker = new SwingWorker<Boolean, Void>() {
+
+            @Override
+            protected Boolean doInBackground() throws Exception {
+
+                Thread.sleep(2000);
+
+                return true;
+            }
+
+            @Override
+            protected void done() {
+
+                bookingInProgress = false;
+                book.setEnabled(true);
+
+                try {
+                    if (get()) {
+
+                        JOptionPane.showMessageDialog(
+                            AppointmentDesk.this,
+                            "Appointment Booked Successfully!\n\n"
+                            + "Patient ID: " + id + "\n"
+                            + "Department: " + selectedDepartment + "\n"
+                            + "Doctor: " + selectedDoctor + "\n"
+                            + "Time: " + selectedTime
+                        );
+
+                        status.setText("Appointment booked successfully");
+
+                    }
+
+                } catch (Exception ex) {
+
+                    JOptionPane.showMessageDialog(
+                        AppointmentDesk.this,
+                        "Booking failed"
+                    );
+
+                    status.setText("Booking failed");
+                }
+            }
+        };
+
+        worker.execute();
+    }
+
+    void clearForm() {
+
+        patientId.setText("");
+        department.setSelectedIndex(0);
+        timeSlot.setSelectedIndex(0);
+        updateDoctors();
+
+        status.setText("Enter patient details");
+    }
+
+    public static void main(String[] args) {
+
+        SwingUtilities.invokeLater(() -> {
+            new AppointmentDesk();
+        });
+    }
+}
