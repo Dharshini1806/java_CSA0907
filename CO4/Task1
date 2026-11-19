@@ -1,0 +1,28 @@
+// FeeService.java
+public class FeeService {
+    public String pay(String regNo, String amountText) {
+        if (regNo == null || regNo.trim().isEmpty())
+            return "Registration number is required";
+        try {
+            double amount = Double.parseDouble(amountText);
+            if (amount <= 0) return "Amount must be positive";
+            // Database payment operation should use PreparedStatement
+            return "Payment successful: Rs. " + amount;
+        } catch (NumberFormatException ex) {
+            return "Enter a valid amount";
+        }
+    }
+}
+
+// Event-handling portion of FeeWindow
+FeeService service = new FeeService();
+pay.addActionListener(e -> {
+    String result = service.pay(regNo.getText(), amount.getText());
+    JOptionPane.showMessageDialog(this, result);
+});
+clear.addActionListener(e -> {
+    regNo.setText("");
+    amount.setText("");
+});
+receipt.addActionListener(e ->
+    JOptionPane.showMessageDialog(this, "Receipt feature"));
