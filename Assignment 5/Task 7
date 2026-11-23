@@ -1,0 +1,58 @@
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+ 
+/** Tasks A2 / B1.3 : unbuffered vs buffered vs readAllLines line counting. */
+public class LineCounter {
+    static long readCalls;
+ 
+    static long countUnbuffered(Path p) throws IOException {
+        long lines = 0; readCalls = 0;
+        try (FileInputStream in = new FileInputStream(p.toFile())) {
+            int b;
+            while ((b = in.read()) != -1) { readCalls++; if (b == '\n') lines++; }
+        }
+        return lines;
+    }
+    static long countBuffered(Path p) throws IOException {
+        long lines = 0; readCalls = 0;
+        byte[] buf = new byte[8192];
+        try (FileInputStream in = new FileInputStream(p.toFile())) {
+            int n;
+            while ((n = in.read(buf)) != -1) { readCalls++; for (int i = 0; i < n; i++) if (buf[i] == '\n') lines++; }
+        }
+        return lines;
+    }
+    static long countReadAllLines(Path p) throws IOException { return Files.readAllLines(p).size(); }
+ 
+    static Path make(String name, long mb) throws IOException {
+        Path p = Paths.get(name);
+        String line = "2026-01-15,192311001,PRESENT,Block-A,Hall-3,09:05:12\n";   // 55 bytes
+        long target = mb * 1024 * 1024;
+        try (BufferedWriter w = Files.newBufferedWriter(p)) {
+            long written = 0;
+            while (written < target) { w.write(line); written += line.length(); }
+        }
+        return p;
+    }
+    static double ms(long t0) { return (System.nanoTime() - t0) / 1e6; }
+ 
+    public static void main(String[] args) throws Exception {
+        long[] sizes = {1, 10, 50};
+        System.out.printf("%-8s %-10s %12s %14s %12s%n", "Size", "Method", "Lines", "read() calls", "Time (ms)");
+        System.out.println("-".repeat(62));
+        for (long mb : sizes) {
+            Path p = make("attendance_" + mb + "MB.log", mb);
+            countBuffered(p); // warm-up
+            long t = System.nanoTime(); long l = countUnbuffered(p); double tu = ms(t); long cu = readCalls;
+            System.out.printf("%-8s %-10s %,12d %,14d %12.1f%n", mb + " MB", "unbuffered", l, cu, tu);
+            t = System.nanoTime(); l = countBuffered(p); double tb = ms(t); long cb = readCalls;
+            System.out.printf("%-8s %-10s %,12d %,14d %12.1f%n", mb + " MB", "buffered", l, cb, tb);
+            t = System.nanoTime(); l = countReadAllLines(p); double tr = ms(t);
+            System.out.printf("%-8s %-10s %,12d %14s %12.1f%n", mb + " MB", "readAll", l, "n/a", tr);
+            System.out.printf("         speed-up buffered vs unbuffered: %.0fx%n%n", tu / tb);
+            if (mb != 50) Files.delete(p);
+        }
+        Files.deleteIfExists(Paths.get("attendance_50MB.log"));
+    }
+}
