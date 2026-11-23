@@ -1,0 +1,60 @@
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+ 
+/** Task A4 evidence : transient fields, graph serialization, versioning (serialVersionUID), serialization vs CSV. */
+public class SerialDemo {
+    static class Resident implements Serializable {
+        private static final long serialVersionUID = 1L;
+        String name; String regNo;
+        transient String password;            // never written to disk
+        transient Object connection;          // live resource, cannot/should not be saved
+        Resident(String n, String r, String p) { name = n; regNo = r; password = p; connection = new Object(); }
+    }
+    static class Room implements Serializable { private static final long serialVersionUID = 1L; int no; List<Resident> residents = new ArrayList<>(); Room(int n) { no = n; } }
+    static class Hostel implements Serializable { private static final long serialVersionUID = 1L; String name; List<Room> rooms = new ArrayList<>(); Hostel(String n) { name = n; } }
+ 
+    public static void main(String[] a) throws Exception {
+        Hostel h = new Hostel("Block-A");
+        Room r = new Room(101);
+        Resident shared = new Resident("Arun", "192311001", "secret");
+        r.residents.add(shared); r.residents.add(new Resident("Divya", "192311003", "pw2"));
+        h.rooms.add(r);
+        Path f = Paths.get("hostel.ser");
+        try (ObjectOutputStream o = new ObjectOutputStream(Files.newOutputStream(f))) { o.writeObject(h); }
+        System.out.println("Saved Hostel -> Rooms -> Residents with ONE writeObject(h) call; file size = " + Files.size(f) + " bytes");
+        try (ObjectInputStream i = new ObjectInputStream(Files.newInputStream(f))) {
+            Hostel h2 = (Hostel) i.readObject();
+            Resident x = h2.rooms.get(0).residents.get(0);
+            System.out.println("Loaded: hostel=" + h2.name + ", room=" + h2.rooms.get(0).no + ", residents=" + h2.rooms.get(0).residents.size());
+            System.out.println("Resident 1 : name=" + x.name + " regNo=" + x.regNo + " password=" + x.password + " connection=" + x.connection + "   <- transient fields are null");
+        }
+        // Mark a Resident WITHOUT transient connection to show failure
+        class Bad implements Serializable { Object conn = new Object(); }
+        try (ObjectOutputStream o = new ObjectOutputStream(new ByteArrayOutputStream())) { o.writeObject(new Bad()); }
+        catch (NotSerializableException e) { System.out.println("Without 'transient', a non-serializable field fails: java.io.NotSerializableException (" + e.getMessage().replaceAll(".*\\$", "") .replace("java.lang.", "") + ")"); }
+ 
+        // ---- Size / time: Java serialization vs CSV, n residents ----
+        System.out.printf("%n%-10s %-12s %-12s %-12s %-12s %-12s %-12s%n", "n", "Ser bytes", "CSV bytes", "Ser save ms", "CSV save ms", "Ser load ms", "CSV load ms");
+        for (int n : new int[]{1000, 10000, 100000}) {
+            List<Resident> list = new ArrayList<>();
+            for (int k = 0; k < n; k++) list.add(new Resident("Student" + k, String.format("19%07d", k), "pw"));
+            Path ps = Paths.get("n.ser"), pc = Paths.get("n.csv");
+            long t = System.nanoTime();
+            try (ObjectOutputStream o = new ObjectOutputStream(new BufferedOutputStream(Files.newOutputStream(ps)))) { o.writeObject(list); }
+            double sSave = (System.nanoTime() - t) / 1e6;
+            t = System.nanoTime();
+            try (BufferedWriter w = Files.newBufferedWriter(pc)) { for (Resident x : list) { w.write(x.name + "," + x.regNo); w.newLine(); } }
+            double cSave = (System.nanoTime() - t) / 1e6;
+            t = System.nanoTime();
+            try (ObjectInputStream i = new ObjectInputStream(new BufferedInputStream(Files.newInputStream(ps)))) { i.readObject(); }
+            double sLoad = (System.nanoTime() - t) / 1e6;
+            t = System.nanoTime();
+            List<Resident> back = new ArrayList<>();
+            try (BufferedReader rd = Files.newBufferedReader(pc)) { String s; while ((s = rd.readLine()) != null) { String[] p = s.split(","); back.add(new Resident(p[0], p[1], null)); } }
+            double cLoad = (System.nanoTime() - t) / 1e6;
+            System.out.printf("%-10d %-12d %-12d %-12.1f %-12.1f %-12.1f %-12.1f%n", n, Files.size(ps), Files.size(pc), sSave, cSave, sLoad, cLoad);
+            Files.delete(ps); Files.delete(pc);
+        }
+    }
+}
