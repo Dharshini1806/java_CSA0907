@@ -1,0 +1,57 @@
+import java.sql.*;
+ 
+/** Task B2 : unsafe (string concatenation) vs safe (PreparedStatement) login check. */
+public class Login {
+    static boolean unsafe(Connection con, String id, String pwd) throws SQLException {
+        String sql = "SELECT * FROM users WHERE id='" + id + "' AND pwd='" + pwd + "'";
+        System.out.println("   SQL sent  : " + sql);
+        try (Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) { return rs.next(); }
+    }
+    static boolean safe(Connection con, String id, String pwd) throws SQLException {
+        String sql = "SELECT * FROM users WHERE id=? AND pwd=?";
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, id); ps.setString(2, pwd);
+            System.out.println("   SQL sent  : " + sql + "   with id=[" + id + "], pwd=[" + pwd + "] as DATA");
+            try (ResultSet rs = ps.executeQuery()) { return rs.next(); }
+        }
+    }
+    public static void main(String[] a) throws Exception {
+        try (Connection con = Db.open()) {
+            String[][] cases = {
+                {"admin", "S3cr3t!", "valid login"},
+                {"admin", "wrong", "wrong password"},
+                {"admin", "x' OR '1'='1", "ATTACK 1: tautology in password"},
+                {"admin'-- ", "anything", "ATTACK 2: comment-out the password check"},
+                {"nobody' OR 1=1 -- ", "", "ATTACK 3: no valid user at all"},
+            };
+            for (String[] c : cases) {
+                System.out.println("\n=== " + c[2] + "  (id=[" + c[0] + "], pwd=[" + c[1] + "]) ===");
+                System.out.println(" UNSAFE (Statement):");
+                boolean u = unsafe(con, c[0], c[1]);
+                System.out.println("   -> login " + (u ? "ACCEPTED" : "rejected"));
+                System.out.println(" SAFE (PreparedStatement):");
+                boolean s = safe(con, c[0], c[1]);
+                System.out.println("   -> login " + (s ? "ACCEPTED" : "rejected"));
+            }
+            // Time cost of validation vs PreparedStatement
+            int N = 20000; String in = "admin"; long t;
+            java.util.regex.Pattern p = java.util.regex.Pattern.compile("[A-Za-z0-9_]{1,20}");
+            t = System.nanoTime(); for (int i = 0; i < N; i++) p.matcher(in).matches();
+            double rx = (System.nanoTime() - t) / 1e3 / N;
+            t = System.nanoTime(); for (int i = 0; i < N; i++) in.replace("'", "''");
+            double esc = (System.nanoTime() - t) / 1e3 / N;
+            for (int i = 0; i < 500; i++) safe2(con, in);
+            t = System.nanoTime(); for (int i = 0; i < 2000; i++) safe2(con, in);
+            double ps = (System.nanoTime() - t) / 1e3 / 2000;
+            t = System.nanoTime(); for (int i = 0; i < 2000; i++) unsafe2(con, in);
+            double un = (System.nanoTime() - t) / 1e3 / 2000;
+            System.out.println("\n=== Per-query cost (microseconds, average) ===");
+            System.out.printf("regex validation only        : %.3f us%n", rx);
+            System.out.printf("quote escaping only          : %.3f us%n", esc);
+            System.out.printf("Statement query (round trip) : %.1f us%n", un);
+            System.out.printf("PreparedStatement round trip : %.1f us%n", ps);
+        }
+    }
+    static void safe2(Connection c, String id) throws SQLException { try (PreparedStatement ps = c.prepareStatement("SELECT * FROM users WHERE id=?")) { ps.setString(1, id); try (ResultSet rs = ps.executeQuery()) { rs.next(); } } }
+    static void unsafe2(Connection c, String id) throws SQLException { try (Statement s = c.createStatement(); ResultSet rs = s.executeQuery("SELECT * FROM users WHERE id='" + id + "'")) { rs.next(); } }
+}
