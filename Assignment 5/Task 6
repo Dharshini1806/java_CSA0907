@@ -1,0 +1,46 @@
+import java.nio.file.*;
+import java.util.*;
+ 
+/** Task B1.1 - test table for add / find / list. */
+public class PassStoreTest {
+    static int pass = 0, total = 0;
+    static void check(String name, boolean ok, String detail) {
+        total++; if (ok) pass++;
+        System.out.printf("%-48s %s   %s%n", name, ok ? "PASS" : "FAIL", detail);
+    }
+    public static void main(String[] a) throws Exception {
+        Path f = Files.createTempFile("passes", ".csv");
+        PassStore s = new PassStore(f);
+        s.add("P1001", "192311001", "Arun", 12, 4500);
+        s.add("P1003", "192311003", "Divya", 7, 3800);
+        s.add("P1004", "192311004", "Kiran", 12, 4500);
+        // Damaged lines (deliberately injected)
+        Files.writeString(f, "P1002,DAMAGED LINE\n", StandardOpenOption.APPEND);   // wrong field count
+        Files.writeString(f, "\n", StandardOpenOption.APPEND);                      // empty line
+        Files.writeString(f, "P1005,192311005,Meena,12,ABC\n", StandardOpenOption.APPEND); // non-numeric amount
+        Files.writeString(f, "P1006,192311006,Ravi,12,", StandardOpenOption.APPEND);        // incomplete write (cut off after a comma: 5 fields, last one empty)
+        System.out.println("File contents:");
+        for (String l : Files.readAllLines(f)) System.out.println("   |" + l + "|");
+        System.out.println();
+ 
+        System.out.println("T1 normal add + find");
+        check("T1 find existing P1003", Arrays.toString(s.find("P1003")).equals("[P1003, 192311003, Divya, 7, 3800.0]"), Arrays.toString(s.find("P1003")));
+        System.out.println("T2 pass ID that does not exist");
+        check("T2 find P9999 (missing) returns null", s.find("P9999") == null, String.valueOf(s.find("P9999")));
+        System.out.println("T3 damaged lines");
+        check("T3a find P1002 (wrong field count) -> null", s.find("P1002") == null, "damaged line skipped");
+        check("T3b find P1004 AFTER damaged lines still works", s.find("P1004") != null, Arrays.toString(s.find("P1004")));
+        check("T3c find P1006 (incomplete write) -> null", s.find("P1006") == null, "truncated line skipped");
+        System.out.println("T4 list by route");
+        List<String[]> r12 = s.listByRoute(12);
+        StringBuilder ids = new StringBuilder();
+        for (String[] x : r12) ids.append(x[0]).append(' ');
+        check("T4 route 12 lists P1001,P1004 only", r12.size() == 2, ids.toString().trim() + "  (P1005 skipped: amount 'ABC')");
+        check("T5 route 99 lists nothing", s.listByRoute(99).isEmpty(), "[]");
+        System.out.println("T6 name that contains the delimiter (known limitation of the 5-field CSV)");
+        s.add("P1010", "192311010", "Kumar, Arun", 12, 4500);
+        check("T6 'Kumar, Arun' is detected as damaged, not mis-parsed", s.find("P1010") == null, "line has 6 fields -> skipped (design fix: escape ',' as \\, - see A1.1)");
+        System.out.println("\nResult: " + pass + "/" + total + " tests passed");
+        Files.delete(f);
+    }
+}
