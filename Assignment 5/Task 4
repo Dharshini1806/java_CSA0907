@@ -1,0 +1,40 @@
+import java.sql.*;
+ 
+/** Task A5 supporting demo: wallet transfer with commit/rollback vs two auto-commit updates. */
+public class TransferDemo {
+    static void show(Connection c, String label) throws SQLException {
+        try (Statement s = c.createStatement(); ResultSet r = s.executeQuery("SELECT owner, balance FROM wallet ORDER BY owner DESC")) {
+            StringBuilder sb = new StringBuilder("   " + label + ": ");
+            while (r.next()) sb.append(r.getString(1)).append("=").append(r.getBigDecimal(2)).append("  ");
+            int total = 0; System.out.println(sb);
+        }
+    }
+    static void reset(Connection c) throws SQLException { try (Statement s = c.createStatement()) { s.executeUpdate("UPDATE wallet SET balance=2000 WHERE owner='hostel'"); s.executeUpdate("UPDATE wallet SET balance=300 WHERE owner='canteen'"); } }
+    static void update(Connection c, String owner, int delta) throws SQLException {
+        try (PreparedStatement ps = c.prepareStatement("UPDATE wallet SET balance = balance + ? WHERE owner = ?")) { ps.setInt(1, delta); ps.setString(2, owner); ps.executeUpdate(); }
+    }
+    static void transfer(Connection c, boolean crash, boolean transactional) throws SQLException {
+        if (transactional) c.setAutoCommit(false);
+        try {
+            update(c, "hostel", -500);
+            if (crash) throw new IllegalStateException("simulated power failure between the two updates");
+            update(c, "canteen", +500);
+            if (transactional) c.commit();
+        } catch (RuntimeException | SQLException e) {
+            System.out.println("   !! " + e.getMessage());
+            if (transactional) { c.rollback(); System.out.println("   rollback() executed"); }
+        } finally { c.setAutoCommit(true); }
+    }
+    public static void main(String[] a) throws Exception {
+        try (Connection c = Db.open()) {
+            reset(c);
+            System.out.println("1) Transaction, no failure"); show(c, "before"); transfer(c, false, true); show(c, "after ");
+            reset(c);
+            System.out.println("\n2) Transaction, failure between the two updates"); show(c, "before"); transfer(c, true, true); show(c, "after ");
+            reset(c);
+            System.out.println("\n3) Two separate auto-commit updates, failure between them (ALTERNATIVE)"); show(c, "before"); transfer(c, true, false); show(c, "after ");
+            System.out.println("   -> Rs.500 has vanished: total was 2300, now 1800");
+            reset(c);
+        }
+    }
+}
