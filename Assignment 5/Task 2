@@ -1,0 +1,109 @@
+import java.sql.SQLException;
+import java.util.List;
+import java.util.Optional;
+ 
+/** Generic data-access interface: T = entity type, K = primary-key type. */
+public interface Dao<T, K> {
+    void insert(T entity) throws SQLException;
+    Optional<T> findById(K id) throws SQLException;
+    List<T> findAll() throws SQLException;
+    int update(T entity) throws SQLException;
+    int delete(K id) throws SQLException;
+}
+
+
+
+import java.sql.*;
+import java.util.*;
+ 
+/** The REPEATED steps (open, prepare, bind, execute, map, close) written ONCE. */
+public class JdbcTemplate {
+    interface Binder { void bind(PreparedStatement ps) throws SQLException; }
+    interface RowMapper<T> { T map(ResultSet rs) throws SQLException; }
+ 
+    static int update(String sql, Binder b) throws SQLException {
+        try (Connection c = Db.open(); PreparedStatement ps = c.prepareStatement(sql)) { b.bind(ps); return ps.executeUpdate(); }
+    }
+    static <T> List<T> query(String sql, Binder b, RowMapper<T> m) throws SQLException {
+        List<T> out = new ArrayList<>();
+        try (Connection c = Db.open(); PreparedStatement ps = c.prepareStatement(sql)) {
+            b.bind(ps);
+            try (ResultSet rs = ps.executeQuery()) { while (rs.next()) out.add(m.map(rs)); }
+        }
+        return out;
+    }
+}
+
+
+
+
+/** Maps to table student(reg_no PK, name, dept, cgpa). */
+public class Student {
+    private String regNo;   // -> reg_no   VARCHAR(12) PRIMARY KEY
+    private String name;    // -> name     VARCHAR(60)
+    private String dept;    // -> dept     VARCHAR(20)
+    private double cgpa;    // -> cgpa     DECIMAL(3,2)
+    public Student(String regNo, String name, String dept, double cgpa) { this.regNo = regNo; this.name = name; this.dept = dept; this.cgpa = cgpa; }
+    public String getRegNo() { return regNo; } public String getName() { return name; }
+    public String getDept() { return dept; }   public double getCgpa() { return cgpa; }
+    @Override public String toString() { return regNo + " | " + name + " | " + dept + " | " + cgpa; }
+}
+
+
+
+import java.sql.SQLException;
+import java.util.*;
+ 
+/** Only the PARTS THAT DIFFER (SQL text + object<->row mapping) live here. */
+public class StudentDao implements Dao<Student, String> {
+    private static final JdbcTemplate.RowMapper<Student> MAP =
+        rs -> new Student(rs.getString("reg_no"), rs.getString("name"), rs.getString("dept"), rs.getDouble("cgpa"));
+ 
+    public void insert(Student s) throws SQLException {
+        JdbcTemplate.update("INSERT INTO student(reg_no,name,dept,cgpa) VALUES (?,?,?,?)",
+            ps -> { ps.setString(1, s.getRegNo()); ps.setString(2, s.getName()); ps.setString(3, s.getDept()); ps.setDouble(4, s.getCgpa()); });
+    }
+    public Optional<Student> findById(String id) throws SQLException {
+        return JdbcTemplate.query("SELECT * FROM student WHERE reg_no=?", ps -> ps.setString(1, id), MAP).stream().findFirst();
+    }
+    public List<Student> findAll() throws SQLException {
+        return JdbcTemplate.query("SELECT * FROM student ORDER BY reg_no", ps -> {}, MAP);
+    }
+    public int update(Student s) throws SQLException {
+        return JdbcTemplate.update("UPDATE student SET name=?, dept=?, cgpa=? WHERE reg_no=?",
+            ps -> { ps.setString(1, s.getName()); ps.setString(2, s.getDept()); ps.setDouble(3, s.getCgpa()); ps.setString(4, s.getRegNo()); });
+    }
+    public int delete(String id) throws SQLException {
+        return JdbcTemplate.update("DELETE FROM student WHERE reg_no=?", ps -> ps.setString(1, id));
+    }
+}
+
+
+
+
+import java.sql.*;
+ 
+public class DaoDemo {
+    public static void main(String[] a) throws Exception {
+        try (Connection c = Db.open(); Statement s = c.createStatement()) {
+            s.executeUpdate("DROP TABLE IF EXISTS student");
+            s.executeUpdate("CREATE TABLE student (reg_no VARCHAR(12) PRIMARY KEY, name VARCHAR(60) NOT NULL, dept VARCHAR(20), cgpa DECIMAL(3,2))");
+            System.out.println("Created table student(reg_no PK, name, dept, cgpa)");
+        }
+        Dao<Student, String> dao = new StudentDao();
+        dao.insert(new Student("192311001", "Arun", "CSE", 8.50));
+        dao.insert(new Student("192311003", "Divya", "IT", 9.10));
+        System.out.println("insert x2        -> findAll():");
+        dao.findAll().forEach(x -> System.out.println("   " + x));
+        System.out.println("findById(192311003) -> " + dao.findById("192311003").orElse(null));
+        System.out.println("findById(000)       -> " + dao.findById("000").orElse(null));
+        System.out.println("update Arun cgpa=9.00 -> rows affected " + dao.update(new Student("192311001", "Arun", "CSE", 9.00)));
+        System.out.println("   " + dao.findById("192311001").get());
+        System.out.println("delete(192311003)    -> rows affected " + dao.delete("192311003"));
+        System.out.println("findAll() now:"); dao.findAll().forEach(x -> System.out.println("   " + x));
+        try (Connection c = Db.open(); Statement s = c.createStatement()) { s.executeUpdate("DROP TABLE student"); }
+    }
+}
+
+
+
