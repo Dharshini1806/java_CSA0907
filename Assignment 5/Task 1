@@ -1,0 +1,51 @@
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.util.*;
+ 
+/** Task A1 supporting demo: (a) delimited text record, (b) DataOutputStream binary record, (c) RandomAccessFile fixed-length alternative. */
+public class A1Demo {
+    static String esc(String s) { return s.replace("\\", "\\\\").replace(",", "\\,").replace("\n", " "); }
+    static final int ID = 8, REG = 12, NAME = 30, STOP = 20, REC = ID + REG + NAME + 2 + STOP + 10 + 8; // = 90 bytes
+    static void putFixed(DataOutput o, String s, int len) throws IOException {
+        byte[] b = Arrays.copyOf(s.getBytes(StandardCharsets.UTF_8), len); o.write(b);
+    }
+    static String getFixed(DataInput i, int len) throws IOException { byte[] b = new byte[len]; i.readFully(b); return new String(b, StandardCharsets.UTF_8).trim(); }
+    public static void main(String[] a) throws Exception {
+        String[][] data = { {"P1001","192311001","Arun","12","Main Gate","2027-03-31","4500.0"},
+                            {"P1002","192311002","Kumar, Arun","7","Hostel Road","2027-03-31","3800.0"},
+                            {"P1003","192311003","Divya","12","Library","2027-03-31","4500.0"} };
+        System.out.println("(a) DELIMITED TEXT FILE  (order: passId,regNo,name,route,stop,validity,amount)");
+        Path t = Paths.get("passes7.csv");
+        try (BufferedWriter w = Files.newBufferedWriter(t)) {
+            for (String[] d : data) { w.write(String.join(",", d[0], d[1], esc(d[2]), d[3], esc(d[4]), d[5], d[6])); w.newLine(); }
+        }
+        for (String l : Files.readAllLines(t)) System.out.println("   " + l);
+        System.out.println("   file size = " + Files.size(t) + " bytes for 3 records (variable length)");
+ 
+        System.out.println("\n(b) BINARY FILE with DataOutputStream (fixed " + REC + "-byte records)");
+        Path b = Paths.get("passes7.bin");
+        try (DataOutputStream o = new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(b)))) {
+            for (String[] d : data) {
+                putFixed(o, d[0], ID); putFixed(o, d[1], REG); putFixed(o, d[2], NAME);
+                o.writeShort(Integer.parseInt(d[3])); putFixed(o, d[4], STOP); putFixed(o, d[5], 10); o.writeDouble(Double.parseDouble(d[6]));
+            }
+        }
+        System.out.println("   file size = " + Files.size(b) + " bytes = 3 x " + REC + "   (every record the same size; names may contain ',' freely)");
+        byte[] raw = Files.readAllBytes(b);
+        StringBuilder hex = new StringBuilder("   first 24 bytes (hex): ");
+        for (int i = 0; i < 24; i++) hex.append(String.format("%02X ", raw[i]));
+        System.out.println(hex);
+ 
+        System.out.println("\n(c) RandomAccessFile: record i is at offset i x " + REC + " -> O(1) seek");
+        try (RandomAccessFile raf = new RandomAccessFile(b.toFile(), "r")) {
+            int i = 1; raf.seek((long) i * REC);
+            byte[] rec = new byte[REC]; raf.readFully(rec);
+            DataInputStream in = new DataInputStream(new ByteArrayInputStream(rec));
+            System.out.println("   seek(" + (i * REC) + ") -> " + getFixed(in, ID) + " | " + getFixed(in, REG) + " | " + getFixed(in, NAME) + " | route " + in.readShort() + " | " + getFixed(in, STOP) + " | " + getFixed(in, 10) + " | " + in.readDouble());
+        }
+        long used = 0; for (String[] d : data) used += d[0].length() + d[1].length() + d[2].length() + 2 + d[4].length() + 10 + 8;
+        System.out.printf("   padding waste: %d of %d bytes are padding (%.0f%%) vs %d bytes in the text file%n", 3L * REC - used, 3 * REC, 100.0 * (3L * REC - used) / (3 * REC), Files.size(t));
+        Files.delete(t); Files.delete(b);
+    }
+}
