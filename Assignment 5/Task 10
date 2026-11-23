@@ -1,0 +1,37 @@
+import java.nio.file.*;
+import java.util.*;
+ 
+/** Task B2 bullet 2 : damaged bus-pass file - wrong field count, non-numeric amount, empty line. */
+public class DamagedFileDemo {
+    public static void main(String[] a) throws Exception {
+        Path f = Paths.get("damaged_passes.csv");
+        Files.writeString(f, String.join("\n",
+            "P2001,192311001,Arun,12,4500.0",          // 1 good
+            "P2002,192311002,Bala,12",                 // 2 wrong number of fields (4)
+            "P2003,192311003,Chitra,7,ABC",            // 3 non-numeric amount
+            "",                                        // 4 empty line
+            "P2005,192311005,Deepa,Q9,3800.0",         // 5 non-numeric route
+            "P2006,192311006,Ezhil,12,4500.0,EXTRA",   // 6 too many fields (6)
+            "P2007,192311007,Farah,12,4500.0") + "\n"); // 7 good
+        System.out.println("Input file damaged_passes.csv:");
+        List<String> lines = Files.readAllLines(f);
+        for (int i = 0; i < lines.size(); i++) System.out.printf(" %d: |%s|%n", i + 1, lines.get(i));
+        PassStore s = new PassStore(f);
+        System.out.println("\nfind() on every ID (good ones should be found, damaged ones skipped):");
+        for (String id : new String[]{"P2001","P2002","P2003","P2005","P2006","P2007"})
+            System.out.printf("  find(%s) -> %s%n", id, Arrays.toString(s.find(id)));
+        System.out.println("\nlistByRoute(12) -> only fully valid records:");
+        for (String[] r : s.listByRoute(12)) System.out.println("  " + Arrays.toString(r));
+        System.out.println("\nStrict line-by-line validation report:");
+        for (int i = 0; i < lines.size(); i++) {
+            String why = null; String[] x = lines.get(i).split(",", -1);
+            if (lines.get(i).isEmpty()) why = "empty line";
+            else if (x.length != 5) why = "expected 5 fields, found " + x.length;
+            else try { Integer.parseInt(x[3]); Double.parseDouble(x[4]); }
+                 catch (NumberFormatException e) { why = "non-numeric " + (x[3].matches("\\d+") ? "amount" : "route") + " '" + (x[3].matches("\\d+") ? x[4] : x[3]) + "'"; }
+            System.out.printf("  line %d: %s%n", i + 1, why == null ? "OK" : "REJECTED - " + why);
+        }
+        Files.delete(f);
+    }
+}
+
