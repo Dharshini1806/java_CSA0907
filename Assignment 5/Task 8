@@ -1,0 +1,36 @@
+import java.nio.file.*;
+import java.util.*;
+ 
+/** Task B1.4 : time to find a pass as the file grows; plus HashMap alternative. */
+public class GrowthTest {
+    public static void main(String[] args) throws Exception {
+        int[] ns = {1000, 5000, 10000, 25000, 50000, 100000};
+        System.out.printf("%-10s %-14s %-18s %-16s %-14s%n", "Records", "File size", "find() last (ms)", "find() miss (ms)", "HashMap get");
+        System.out.println("-".repeat(78));
+        for (int n : ns) {
+            Path f = Paths.get("growth_" + n + ".csv");
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < n; i++)
+                sb.append(String.format("P%06d,19%07d,Student%d,%d,%.1f%n", i, i, i, i % 40 + 1, 3000 + (i % 20) * 100.0));
+            Files.writeString(f, sb.toString());
+            PassStore s = new PassStore(f);
+            String last = String.format("P%06d", n - 1);
+            for (int w = 0; w < 5; w++) s.find(last);                     // warm up JIT
+            int reps = 20;
+            long t = System.nanoTime();
+            for (int r = 0; r < reps; r++) s.find(last);
+            double tLast = (System.nanoTime() - t) / 1e6 / reps;
+            t = System.nanoTime();
+            for (int r = 0; r < reps; r++) s.find("NOPE");
+            double tMiss = (System.nanoTime() - t) / 1e6 / reps;
+            // HashMap alternative: load once, then query
+            Map<String, String[]> map = new HashMap<>();
+            for (String line : Files.readAllLines(f)) { String[] x = line.split(",", -1); if (x.length == 5) map.put(x[0], x); }
+            t = System.nanoTime();
+            for (int r = 0; r < 100000; r++) map.get(last);
+            double tMap = (System.nanoTime() - t) / 1e6 / 100000 * 1000; // microseconds
+            System.out.printf("%-10d %-14s %-18.3f %-16.3f %.3f us%n", n, Files.size(f) / 1024 + " KB", tLast, tMiss, tMap);
+            Files.delete(f);
+        }
+    }
+}
